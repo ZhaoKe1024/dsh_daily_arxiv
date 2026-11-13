@@ -1,0 +1,27 @@
+# dsh_daily_arxiv bundle patch.
+#
+# Values below are defaults; edit them here or in the profile's own patch layer.
+# The plugin persists user data (keywords, model config, downloads) in this
+# package directory, never in this file.
+- insert:
+    - id: dsh-daily-arxiv
+      name: dsh-daily-arxiv
+      config:
+        # Local hour (0-23) of the daily automatic run. Default 10 = 10:00.
+        scheduleHour: 10
+        # Set false to keep the UI and tools but never start the job automatically.
+        enableSchedule: true
+        # Maximum papers requested from the arXiv API per run.
+        maxResults: 200
+        # Maximum papers actually downloaded per run.
+        maxDownloads: 40
+        # Acceptance threshold for the LLM abstract screening (0-100).
+        minScore: 60
+        # Minimum seconds between two arXiv HTTP requests.
+        requestDelaySeconds: 3
+        # Abort a pipeline run after this many minutes.
+        runTimeoutMinutes: 90
+        # Directory for keywords.txt, config/, src/ and logs/.
+        dataDir: .
+        # Python executable used to run python/arxiv_daily.py.
+        python: python

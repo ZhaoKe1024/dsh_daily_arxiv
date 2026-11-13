@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "arXiv daily",
+    "description": "Searches arXiv for your keyword library every day at 10:00, screens each abstract with your own OpenAI-compatible model, downloads the PDF and LaTeX source of the papers that pass, and writes a Markdown report."
+  }
+}

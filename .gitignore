@@ -1,0 +1,15 @@
+# Runtime data produced by the plugin — never committed.
+src/
+logs/
+config/
+keywords.txt
+.venv/
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Tooling leftovers
+.DS_Store
+Thumbs.db
+node_modules/

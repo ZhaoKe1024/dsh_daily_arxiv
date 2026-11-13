@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "arXiv 每日论文",
+    "description": "每天 10:00 按关键词库检索 arXiv，用你自己的 OpenAI 兼容模型按摘要判定主题相关性，下载通过项的 PDF 与 LaTeX 源码，并生成 Markdown 介绍报告。"
+  }
+}

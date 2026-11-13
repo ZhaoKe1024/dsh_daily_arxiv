@@ -1,0 +1,7 @@
+# dsh_daily_arxiv requires the official OpenAI Python SDK for the
+# "screen abstracts" and "write the Markdown report" steps.
+#
+#   python -m pip install -r requirements.txt
+#
+# Python 3.8+ is supported.
+openai>=1.0.0

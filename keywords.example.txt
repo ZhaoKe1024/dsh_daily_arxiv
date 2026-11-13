@@ -1,0 +1,26 @@
+# dsh_daily_arxiv — example keyword library
+#
+# The plugin keeps its live library in `keywords.txt` next to this file and
+# creates it from these defaults on first activation. Edit the library from the
+# Settings → arXiv daily → Keywords tab, or edit the file directly; both paths
+# write the same file.
+#
+# Format
+#   one keyword phrase per line
+#   blank lines are ignored
+#   lines starting with # are comments
+#
+# How the phrases are queried
+#   each phrase becomes an arXiv full-text phrase search `all:"<phrase>"`
+#   a phrase containing "+" is also tried with the "+" replaced by a space,
+#   so `LLM+Optimization` searches both `"LLM+Optimization"` and `"LLM Optimization"`
+#   all phrases are OR-ed together and bounded by submittedDate:[from TO to]
+#
+# Operations Research
+# Optimization Modeling
+# LLM+Optimization
+# Agent+Optimization
+# LLM Modeling Optimization
+# LLM Formulation
+# LLM Modeling
+# LLM Evolutionary

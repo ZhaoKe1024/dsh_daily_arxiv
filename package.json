@@ -1,0 +1,36 @@
+{
+  "name": "dsh-daily-arxiv",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Daily arXiv discovery for DeepSeek Harness: keyword search, LLM abstract screening, PDF + LaTeX source download, and a Markdown report, with a Settings page and a daily 10:00 schedule.",
+  "license": "MIT",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
+    "python/arxiv_daily.py",
+    "requirements.txt",
+    "keywords.example.txt",
+    "README.md",
+    "LICENSE"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": []
+    }
+  }
+}

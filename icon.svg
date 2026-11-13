@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="arXiv daily">
+  <defs>
+    <linearGradient id="arxivDailyBg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2f6fed"/>
+      <stop offset="1" stop-color="#7c3aed"/>
+    </linearGradient>
+  </defs>
+  <rect x="3" y="3" width="58" height="58" rx="15" fill="url(#arxivDailyBg)"/>
+  <path d="M23 15h13l9 9v23a5 5 0 0 1-5 5H23a5 5 0 0 1-5-5V20a5 5 0 0 1 5-5z" fill="#ffffff" opacity="0.96"/>
+  <path d="M36 15v9h9" fill="none" stroke="#2f6fed" stroke-width="2.2" stroke-linejoin="round"/>
+  <circle cx="27" cy="33" r="2.7" fill="#2f6fed"/>
+  <circle cx="37" cy="42" r="2.7" fill="#7c3aed"/>
+  <circle cx="25" cy="45" r="2.7" fill="#2f6fed"/>
+  <path d="M27 33l10 9M25 45l2-12" fill="none" stroke="#2f6fed" stroke-width="1.7" opacity="0.75"/>
+</svg>

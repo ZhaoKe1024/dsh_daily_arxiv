@@ -739,6 +739,7 @@ export function apply(ctx, config = {}) {
         updated_at: new Date().toISOString(),
       }
       await fsp.writeFile(llmPath, JSON.stringify(record, null, 2), { encoding: 'utf8', mode: 0o600 })
+      runtime.lastError = ''
       return {
         ok: true,
         data: {
@@ -758,6 +759,8 @@ export function apply(ctx, config = {}) {
       } catch {
         /* already absent */
       }
+      // 删掉配置后，上一次「连通性测试失败」之类的错误不再有意义
+      runtime.lastError = ''
       return { ok: true, data: { configured: false } }
     },
 

@@ -121,6 +121,9 @@ export function apply(ctx, config = {}) {
     requestDelaySeconds: Number.isFinite(Number(config.requestDelaySeconds))
       ? Number(config.requestDelaySeconds)
       : 3,
+    paperIntervalSeconds: Number.isFinite(Number(config.paperIntervalSeconds))
+      ? Number(config.paperIntervalSeconds)
+      : 5,
     runTimeoutMinutes: Number(config.runTimeoutMinutes) > 0 ? Number(config.runTimeoutMinutes) : 90,
   }
 
@@ -130,6 +133,7 @@ export function apply(ctx, config = {}) {
   const configDir = path.join(dataDir, 'config')
   const llmPath = path.join(configDir, 'llm.json')
   const statePath = path.join(configDir, 'state.json')
+  const settingsPath = path.join(configDir, 'settings.json')
   const logsDir = path.join(dataDir, 'logs')
 
   /** Runtime snapshot shared by the UI and the tool. */
@@ -146,6 +150,8 @@ export function apply(ctx, config = {}) {
 
   let queue = Promise.resolve()
   let state = { lastAutoDate: '', lastRunAt: '', lastResult: null }
+  /** Runtime-editable overrides persisted in config/settings.json. */
+  let overrides = {}
 
   // -------------------------------------------------------------------------
   // Files
@@ -183,6 +189,39 @@ export function apply(ctx, config = {}) {
   async function saveState() {
     await fsp.mkdir(configDir, { recursive: true })
     await fsp.writeFile(statePath, JSON.stringify(state, null, 2), 'utf8')
+  }
+
+  function clampNumber(value, min, max) {
+    if (value === undefined || value === null || value === '') return undefined
+    const parsed = Number(value)
+    if (!Number.isFinite(parsed)) return undefined
+    return Math.min(max, Math.max(min, parsed))
+  }
+
+  /** Load the UI-editable throttle overrides (config/settings.json). */
+  async function loadOverrides() {
+    try {
+      const parsed = parseJsonLoose(await fsp.readFile(settingsPath, 'utf8'))
+      overrides = parsed && typeof parsed === 'object' ? parsed : {}
+    } catch {
+      overrides = {}
+    }
+    return overrides
+  }
+
+  /**
+   * Effective download pacing: the patch config is the default and
+   * config/settings.json wins when the user changed it from the panel.
+   * `requestDelaySeconds` spaces every arXiv HTTP request, `paperIntervalSeconds`
+   * adds a fixed pause between two papers (the anti-crawling knob).
+   */
+  function effectiveThrottle() {
+    return {
+      requestDelaySeconds:
+        clampNumber(overrides.requestDelaySeconds, 0, 120) ?? settings.requestDelaySeconds,
+      paperIntervalSeconds:
+        clampNumber(overrides.paperIntervalSeconds, 0, 600) ?? settings.paperIntervalSeconds,
+    }
   }
 
   function parseKeywords(raw) {
@@ -372,7 +411,7 @@ export function apply(ctx, config = {}) {
   }
 
   function baseArgs(extra) {
-    const llmArgs = []
+    const throttle = effectiveThrottle()
     return [
       '--data-dir', dataDir,
       '--keywords-file', keywordsPath,
@@ -380,8 +419,8 @@ export function apply(ctx, config = {}) {
       '--max-results', String(settings.maxResults),
       '--max-downloads', String(settings.maxDownloads),
       '--min-score', String(settings.minScore),
-      '--delay', String(settings.requestDelaySeconds),
-      ...llmArgs,
+      '--delay', String(throttle.requestDelaySeconds),
+      '--paper-interval', String(throttle.paperIntervalSeconds),
       ...extra,
     ]
   }
@@ -669,6 +708,11 @@ export function apply(ctx, config = {}) {
         runs,
         python: settings.pythonExe,
         script: scriptPath,
+        throttle: effectiveThrottle(),
+        throttleDefaults: {
+          requestDelaySeconds: settings.requestDelaySeconds,
+          paperIntervalSeconds: settings.paperIntervalSeconds,
+        },
         logTail: runtime.logTail.slice(-25),
         apiRouteRegistered: runtime.apiRouteRegistered,
         apiError: runtime.apiError,
@@ -807,6 +851,21 @@ export function apply(ctx, config = {}) {
       return { ok: true, data: result }
     },
 
+    async 'settings.get'() {
+      return { ok: true, data: effectiveThrottle() }
+    },
+
+    async 'settings.save'(payload) {
+      const requestDelaySeconds = clampNumber(payload?.requestDelaySeconds, 0, 120)
+      const paperIntervalSeconds = clampNumber(payload?.paperIntervalSeconds, 0, 600)
+      if (requestDelaySeconds === undefined) throw new Error('请求间隔必须是 0-120 之间的数字')
+      if (paperIntervalSeconds === undefined) throw new Error('每篇间隔必须是 0-600 之间的数字')
+      overrides = { ...overrides, requestDelaySeconds, paperIntervalSeconds }
+      await fsp.mkdir(configDir, { recursive: true })
+      await fsp.writeFile(settingsPath, JSON.stringify(overrides, null, 2), 'utf8')
+      return { ok: true, data: effectiveThrottle() }
+    },
+
     async 'run.state'() {
       return {
         ok: true,
@@ -932,6 +991,7 @@ export function apply(ctx, config = {}) {
                 'process',
                 'run_auto',
                 'read_report',
+                'set_throttle',
               ],
               description: 'Operation to perform.',
             },
@@ -950,6 +1010,14 @@ export function apply(ctx, config = {}) {
               description: 'process: arXiv ids chosen from a previous search.',
             },
             path: { type: 'string', description: 'read_report: report.md path; omit for the newest run.' },
+            request_delay_seconds: {
+              type: 'number',
+              description: 'set_throttle: minimum seconds between two arXiv HTTP requests (0-120).',
+            },
+            paper_interval_seconds: {
+              type: 'number',
+              description: 'set_throttle: fixed seconds to wait between two downloaded papers (0-600).',
+            },
           },
           required: ['action'],
           additionalProperties: false,
@@ -987,6 +1055,11 @@ export function apply(ctx, config = {}) {
               return await actions['auto.runNow']()
             case 'read_report':
               return await actions['report.read']({ path: args?.path })
+            case 'set_throttle':
+              return await actions['settings.save']({
+                requestDelaySeconds: args?.request_delay_seconds,
+                paperIntervalSeconds: args?.paper_interval_seconds,
+              })
             default:
               throw new Error(`未知 action：${action}`)
           }
@@ -1004,6 +1077,7 @@ export function apply(ctx, config = {}) {
       try {
         await ensureScaffold()
         await loadState()
+        await loadOverrides()
         if (disposed) return
         startWatchdog()
         armTimer('activation')

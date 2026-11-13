@@ -128,6 +128,7 @@ armTimer(reason)
 | `keywords.txt` | UI / 工具 / 首次激活 | 关键词库，UTF-8，支持 `#` 注释 |
 | `config/llm.json` | `llm.save` | `{ base_url, api_key, model, model_name, updated_at }`，POSIX 下 0600 |
 | `config/state.json` | Host | `{ lastAutoDate, lastRunAt, lastResult }` |
+| `config/settings.json` | `settings.save` | 界面上改的节流参数（`requestDelaySeconds` / `paperIntervalSeconds`），优先级高于 `cordis.patch.yml` 的默认值 |
 | `src/arxiv_*/` | Python | 每次运行的下载与报告 |
 | `logs/` | 预留 | 目前日志只进内存与界面 |
 
@@ -142,7 +143,7 @@ python arxiv_daily.py --mode {auto|search|process|test-llm} \
   --data-dir DIR --keywords-file FILE --llm-config FILE \
   --date YYYY-MM-DD | --from YYYY-MM-DD --to YYYY-MM-DD \
   [--ids '["id1","id2"]'] [--max-results N] [--max-downloads N] \
-  [--min-score N] [--delay SECONDS] [--force]
+  [--min-score N] [--delay SECONDS] [--paper-interval SECONDS] [--force]
 ```
 
 - 退出码：`0` = 结果 `ok:true`；`1` = 失败（同时输出带 `error` 的 `@@RESULT`）。
@@ -152,7 +153,9 @@ python arxiv_daily.py --mode {auto|search|process|test-llm} \
 
 ### 反爬与限速
 
-- 所有 arXiv 请求共享一把全局锁 + 最小间隔（默认 3s，官方建议值），与线程数无关。
+- **两层节流，都可手动设置。** `requestDelaySeconds`（默认 3s，官方建议值）由一把全局锁实现，任意两次 arXiv 请求之间至少等待这么久；`paperIntervalSeconds`（默认 5s）在单篇管线结束后固定 sleep 再处理下一篇，是控制整批速率的主旋钮。两者都由 Host 通过 `--delay` / `--paper-interval` 传给 Python。
+- 面板「概览 → 下载节流」改的是 `config/settings.json`，优先级高于 `cordis.patch.yml` 默认值；`status.throttle` 回显当前生效值，`run.json.throttle` 记录每次运行实际使用的值。
+- 请求串行执行，没有并发爬取。
 - HTTP 4xx 立即放弃；5xx / 网络错误按 3、6、9 秒退避重试，最多 3 次。
 - HTTPS 优先使用 `certifi` 的 CA 包并叠加系统根证书，规避 Conda 环境 `CERTIFICATE_VERIFY_FAILED`。
 

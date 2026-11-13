@@ -124,7 +124,15 @@ def set_delay(seconds):
     DELAY_SECONDS = max(0.0, float(seconds or 0))
 
 
+def set_paper_interval(seconds):
+    global PAPER_INTERVAL
+    PAPER_INTERVAL = max(0.0, float(seconds if seconds is not None else 0))
+
+
+# 两次 arXiv 请求之间的最小间隔（官方建议 3 秒）
 DELAY_SECONDS = 3.0
+# 两篇论文之间的额外间隔，用于控制整批下载速率
+PAPER_INTERVAL = 5.0
 
 
 def throttle():
@@ -1038,6 +1046,12 @@ def finish_run(args, data_dir, out_dir, keywords, candidates, mode):
     if len(selected) > limit:
         errors.append("通过判定的论文有 %d 篇，按上限只处理前 %d 篇" % (len(selected), limit))
     for index, item in enumerate(selected[:limit], 1):
+        # 两篇论文之间固定等待，降低被 arXiv 判定为爬虫的风险
+        if index > 1 and PAPER_INTERVAL > 0:
+            emit_progress("throttle", index - 1, limit,
+                          "节流等待 %.0f 秒" % PAPER_INTERVAL)
+            log("  节流：等待 %.1f 秒再处理下一篇" % PAPER_INTERVAL)
+            time.sleep(PAPER_INTERVAL)
         emit_progress("download", index - 1, limit,
                       "处理 %s" % (item.get("title") or item["id"])[:60])
         if not item.get("abstract"):
@@ -1104,6 +1118,10 @@ def finish_run(args, data_dir, out_dir, keywords, candidates, mode):
         "out_dir": str(out_dir),
         "report": str(report_path),
         "keywords": keywords,
+        "throttle": {
+            "request_delay_seconds": DELAY_SECONDS,
+            "paper_interval_seconds": PAPER_INTERVAL,
+        },
         "counts": {
             "candidates": len(candidates),
             "selected": len(selected),
@@ -1193,11 +1211,15 @@ def main():
     parser.add_argument("--max-results", type=int, default=200)
     parser.add_argument("--max-downloads", type=int, default=40)
     parser.add_argument("--min-score", type=int, default=60)
-    parser.add_argument("--delay", type=float, default=3.0)
+    parser.add_argument("--delay", type=float, default=3.0,
+                        help="两次 arXiv 请求之间的最小间隔（秒）")
+    parser.add_argument("--paper-interval", type=float, default=5.0,
+                        help="两篇论文之间的额外等待（秒）")
     parser.add_argument("--force", action="store_true")
     args = parser.parse_args()
 
     set_delay(args.delay)
+    set_paper_interval(args.paper_interval)
     data_dir = Path(args.data_dir).resolve() if args.data_dir else Path.cwd()
     data_dir.mkdir(parents=True, exist_ok=True)
 

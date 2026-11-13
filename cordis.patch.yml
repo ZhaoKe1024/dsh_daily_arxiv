@@ -17,8 +17,12 @@
         maxDownloads: 40
         # Acceptance threshold for the LLM abstract screening (0-100).
         minScore: 60
-        # Minimum seconds between two arXiv HTTP requests.
+        # Minimum seconds between two arXiv HTTP requests (arXiv asks for 3).
         requestDelaySeconds: 3
+        # Fixed seconds to wait between two downloaded papers. This is the
+        # anti-crawling knob: raise it for large batches. The panel can
+        # override both values at runtime (stored in config/settings.json).
+        paperIntervalSeconds: 5
         # Abort a pipeline run after this many minutes.
         runTimeoutMinutes: 90
         # Directory for keywords.txt, config/, src/ and logs/.

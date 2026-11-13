@@ -80,6 +80,11 @@ window.__ModuleLoader__.load({
       noSelection: '请至少勾选一篇论文',
       report: 'Markdown 报告',
       noReport: '还没有生成报告',
+      throttleTitle: '下载节流（反爬）',
+      throttleHint:
+        'arXiv 官方建议每 3 秒最多一个请求。请求间隔作用于每一次 arXiv 请求；每篇论文间隔在两篇论文之间再固定等待，用来压低整批下载速率。',
+      requestDelay: '请求间隔（秒）',
+      paperInterval: '每篇论文间隔（秒）',
       openReport: '查看报告',
       closeReport: '收起',
       runs: '历史运行',
@@ -172,6 +177,11 @@ window.__ModuleLoader__.load({
       noSelection: 'Select at least one paper',
       report: 'Markdown report',
       noReport: 'No report generated yet',
+      throttleTitle: 'Download pacing (anti-crawling)',
+      throttleHint:
+        'arXiv asks for at most one request every 3 seconds. The request delay spaces every arXiv request; the paper interval adds a fixed wait between two papers to slow the whole batch down.',
+      requestDelay: 'Request delay (s)',
+      paperInterval: 'Paper interval (s)',
       openReport: 'View report',
       closeReport: 'Collapse',
       runs: 'Past runs',
@@ -422,6 +432,7 @@ window.__ModuleLoader__.load({
       const [llmForm, setLlmForm] = React.useState({ base_url: '', api_key: '', model_name: '' })
       const [llmTest, setLlmTest] = React.useState('')
       const [manual, setManual] = React.useState({ from: isoDay(0), to: isoDay(0) })
+      const [throttle, setThrottle] = React.useState({ requestDelaySeconds: 3, paperIntervalSeconds: 5 })
       const [candidates, setCandidates] = React.useState([])
       const [selected, setSelected] = React.useState({})
       const [report, setReport] = React.useState(null)
@@ -505,6 +516,12 @@ window.__ModuleLoader__.load({
           api_key: current.api_key || '',
           model_name: current.model_name || status.llm?.model_name || '',
         }))
+        if (status.throttle) {
+          setThrottle({
+            requestDelaySeconds: status.throttle.requestDelaySeconds ?? 3,
+            paperIntervalSeconds: status.throttle.paperIntervalSeconds ?? 5,
+          })
+        }
       }, [status?.dataDir])
 
       const notify = (kind, message) => setToast({ kind, message })
@@ -588,6 +605,26 @@ window.__ModuleLoader__.load({
         try {
           await call('auto.runNow')
           notify('ok', t('processing'))
+          await refresh()
+        } catch (error) {
+          fail(error)
+        } finally {
+          setBusy('')
+        }
+      }
+
+      async function saveThrottle() {
+        setBusy('throttle-save')
+        try {
+          const data = await call('settings.save', {
+            requestDelaySeconds: Number(throttle.requestDelaySeconds),
+            paperIntervalSeconds: Number(throttle.paperIntervalSeconds),
+          })
+          setThrottle({
+            requestDelaySeconds: data.requestDelaySeconds,
+            paperIntervalSeconds: data.paperIntervalSeconds,
+          })
+          notify('ok', t('saved'))
           await refresh()
         } catch (error) {
           fail(error)
@@ -706,6 +743,51 @@ window.__ModuleLoader__.load({
                 Button,
                 { kind: 'primary', onClick: () => void runNow(), busy: busy === 'auto', disabled: Boolean(status?.running) },
                 t('runNow'),
+              ),
+            ),
+          ),
+          h(
+            'div',
+            { key: 'throttle', className: 'dsh-arxiv-card' },
+            h('h3', { className: 'dsh-arxiv-card-title' }, t('throttleTitle')),
+            h('p', { className: 'dsh-arxiv-hint', style: { marginTop: 0 } }, t('throttleHint')),
+            h(
+              'div',
+              { className: 'dsh-arxiv-row' },
+              h(
+                'label',
+                { className: 'dsh-arxiv-field is-narrow' },
+                h('span', { className: 'dsh-arxiv-label' }, t('requestDelay')),
+                h('input', {
+                  className: 'dsh-arxiv-input',
+                  type: 'number',
+                  min: 0,
+                  max: 120,
+                  step: 0.5,
+                  value: throttle.requestDelaySeconds,
+                  onChange: (event) =>
+                    setThrottle({ ...throttle, requestDelaySeconds: event.target.value }),
+                }),
+              ),
+              h(
+                'label',
+                { className: 'dsh-arxiv-field is-narrow' },
+                h('span', { className: 'dsh-arxiv-label' }, t('paperInterval')),
+                h('input', {
+                  className: 'dsh-arxiv-input',
+                  type: 'number',
+                  min: 0,
+                  max: 600,
+                  step: 0.5,
+                  value: throttle.paperIntervalSeconds,
+                  onChange: (event) =>
+                    setThrottle({ ...throttle, paperIntervalSeconds: event.target.value }),
+                }),
+              ),
+              h(
+                Button,
+                { kind: 'primary', onClick: () => void saveThrottle(), busy: busy === 'throttle-save' },
+                t('save'),
               ),
             ),
           ),

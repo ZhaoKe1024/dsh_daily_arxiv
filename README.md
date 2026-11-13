@@ -323,7 +323,7 @@ python -m pip install -r requirements.txt
 ## 常见问题
 
 **Q: 概览页一直显示「加载中」，或提示 HTTP 404？**
-A: 说明 UI 没找到 Host 路由。确认插件行已启用（`dsh-daily-arxiv`），并确认该 profile 是 Web 版（有 `connection` 服务）。改完代码后需要重启 Host 才加载新的 `index.js`。
+A: 说明 UI 没找到 Host 路由（`/api/dsh-daily-arxiv`）。先刷新页面重试；仍然 404 说明 Host 侧注册没成功——确认插件行 `dsh-daily-arxiv` 已启用、该 profile 是 Web 版（有 `connection` 服务），并且**改过 `index.js` 后必须重启 Host**（旧的 Host 进程里没有新代码）。让 Agent 调用 `arxiv_daily status` 可以看到 `apiRouteRegistered` 与 `apiError` 两个自查字段。
 
 **Q: 运行失败，日志里是 `CERTIFICATE_VERIFY_FAILED`？**
 A: 某些 Conda/嵌入式 Python 没有把系统根证书放进默认路径。脚本会优先使用 `certifi` 的 CA 包（已随 openai/httpx 安装），若仍失败可 `python -m pip install certifi`，或设置环境变量 `SSL_CERT_FILE` 指向一个 `cacert.pem`。

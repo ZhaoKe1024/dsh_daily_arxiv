@@ -37,6 +37,17 @@ content-type: application/json
 - HTTP 状态码只表达传输层结果：200 = 请求已被处理（`ok` 决定业务成败），400 = 请求体不是 JSON，404 = 未知 `action`，405 = 非 POST。
 - 鉴权、Host/Origin 校验、浏览器 Cookie 校验全部由 `@deepseek-ai/dsh-client-connection` 完成，插件不重复实现；非 owner 的 Peer 由 Connection 直接回 403。
 
+> **注册路径必须带 `/api` 前缀。** `connection.fetch.register()` 用
+> `endpointFromPath('/api', route.path)` 校验路径，`route.path` 必须是完整路径
+> `/api/dsh-daily-arxiv`；写成相对路径 `/dsh-daily-arxiv` 会直接抛错，路由不会被
+> 注册，浏览器随后拿到的是 404（而**不是** 401——鉴权发生在路由匹配之前，所以
+> 「未带 Cookie 返回 401」并不能证明路由存在）。`status` 里的
+> `apiRouteRegistered` / `apiError` 就是为此保留的自查位。
+>
+> 浏览器侧仍然请求**文档相对**路径 `api/dsh-daily-arxiv`（与官方
+> `session-log-export` 的 `api/session.export` 同一写法），它会解析成上面的完整
+> 路径；这样在挂载前缀下也成立。
+
 ### 动作表
 
 | `action` | `payload` | `data` |

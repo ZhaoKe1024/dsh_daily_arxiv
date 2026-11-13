@@ -72,6 +72,11 @@ function json(status, payload) {
   })
 }
 
+/** Parse JSON that a text editor may have saved with a UTF-8 BOM. */
+function parseJsonLoose(raw) {
+  return JSON.parse(String(raw).replace(/^\uFEFF/, ''))
+}
+
 /** Prefer the plugin-local virtualenv when it exists; an absolute `python` config wins. */
 function resolvePython(configured) {
   const explicit = text(configured)
@@ -134,6 +139,8 @@ export function apply(ctx, config = {}) {
     lastError: '',
     nextRunAt: '',
     logTail: [],
+    apiRouteRegistered: false,
+    apiError: '',
     startedAt: new Date().toISOString(),
   }
 
@@ -161,7 +168,7 @@ export function apply(ctx, config = {}) {
   async function loadState() {
     try {
       const raw = await fsp.readFile(statePath, 'utf8')
-      const parsed = JSON.parse(raw)
+      const parsed = parseJsonLoose(raw)
       state = {
         lastAutoDate: text(parsed.lastAutoDate),
         lastRunAt: text(parsed.lastRunAt),
@@ -198,7 +205,7 @@ export function apply(ctx, config = {}) {
 
   async function readLlm() {
     try {
-      const parsed = JSON.parse(await fsp.readFile(llmPath, 'utf8'))
+      const parsed = parseJsonLoose(await fsp.readFile(llmPath, 'utf8'))
       return {
         base_url: text(parsed.base_url),
         api_key: text(parsed.api_key),
@@ -231,7 +238,7 @@ export function apply(ctx, config = {}) {
       const reportFile = path.join(dir, 'report.md')
       let manifest = null
       try {
-        manifest = JSON.parse(await fsp.readFile(runFile, 'utf8'))
+        manifest = parseJsonLoose(await fsp.readFile(runFile, 'utf8'))
       } catch {
         // 只有 candidates.json 的目录（纯检索）不算一次运行，不列进报告列表
         continue
@@ -663,6 +670,8 @@ export function apply(ctx, config = {}) {
         python: settings.pythonExe,
         script: scriptPath,
         logTail: runtime.logTail.slice(-25),
+        apiRouteRegistered: runtime.apiRouteRegistered,
+        apiError: runtime.apiError,
         startedAt: runtime.startedAt,
       },
     }
@@ -867,14 +876,28 @@ export function apply(ctx, config = {}) {
   withService(ctx, 'connection', (connection, scope) => {
     const effect = typeof scope.effect === 'function' ? scope.effect.bind(scope) : ctx.effect.bind(ctx)
     effect(() => {
-      const dispose = connection.fetch.register({
-        path: '/dsh-daily-arxiv',
-        methods: ['POST'],
-        requestBody: 'buffered',
-        fetch: (request) => handleApi(request),
-      })
-      return () => {
-        void Promise.resolve(dispose()).catch(() => undefined)
+      try {
+        // Connection registers exact Fetch routes by their FULL pathname and
+        // validates it with endpointFromPath('/api', path), so the path must
+        // start with `/api/`. The browser side requests the document-relative
+        // `api/dsh-daily-arxiv`, which resolves to exactly this pathname.
+        const dispose = connection.fetch.register({
+          path: '/api/dsh-daily-arxiv',
+          methods: ['POST'],
+          requestBody: 'buffered',
+          fetch: (request) => handleApi(request),
+        })
+        runtime.apiRouteRegistered = true
+        runtime.apiError = ''
+        return () => {
+          runtime.apiRouteRegistered = false
+          void Promise.resolve(dispose()).catch(() => undefined)
+        }
+      } catch (error) {
+        runtime.apiRouteRegistered = false
+        runtime.apiError = error?.message ?? String(error)
+        pushLog(`[api] 路由注册失败：${runtime.apiError}`)
+        return () => undefined
       }
     })
   })
